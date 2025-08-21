@@ -1,26 +1,33 @@
+import { createClient } from "@/lib/supabase/client"
+
 export interface Cliente {
   id: string
   nome: string
   telefone: string
-  dataCadastro: Date
+  dataCadastro?: Date
+  created_at?: string
 }
 
 export interface Agendamento {
   id: string
-  clienteId: string
-  clienteNome: string
-  data: Date
-  hora: string
-  servico: string
+  cliente_id: string
+  clienteNome?: string
+  data_agendamento: string
+  hora_agendamento: string
+  servico_id?: string
+  servico?: string
   preco: number
   status: "agendado" | "concluido" | "cancelado"
+  observacoes?: string
+  created_at?: string
 }
 
 export interface FotoPortfolio {
   id: string
-  url: string
-  descricao: string
-  dataUpload: Date
+  titulo: string
+  descricao?: string
+  imagem_url: string
+  created_at?: string
 }
 
 export interface Servico {
@@ -28,187 +35,387 @@ export interface Servico {
   nome: string
   preco: number
   duracao: number // em minutos
+  created_at?: string
 }
 
-// Dados mockados para demonstração
-const clientesMock: Cliente[] = [
-  {
-    id: "1",
-    nome: "Maria Silva",
-    telefone: "(11) 99999-9999",
-    dataCadastro: new Date("2024-01-15"),
-  },
-  {
-    id: "2",
-    nome: "Ana Santos",
-    telefone: "(11) 88888-8888",
-    dataCadastro: new Date("2024-02-10"),
-  },
-  {
-    id: "3",
-    nome: "Julia Costa",
-    telefone: "(11) 77777-7777",
-    dataCadastro: new Date("2024-03-05"),
-  },
-]
+export const getClientes = async (): Promise<Cliente[]> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("clientes").select("*").order("created_at", { ascending: false })
 
-const agendamentosMock: Agendamento[] = [
-  {
-    id: "1",
-    clienteId: "1",
-    clienteNome: "Maria Silva",
-    data: new Date(),
-    hora: "09:00",
-    servico: "Esmaltação Gel",
-    preco: 45.0,
-    status: "agendado",
-  },
-  {
-    id: "2",
-    clienteId: "2",
-    clienteNome: "Ana Santos",
-    data: new Date(),
-    hora: "14:00",
-    servico: "Alongamento + Decoração",
-    preco: 80.0,
-    status: "agendado",
-  },
-  {
-    id: "3",
-    clienteId: "3",
-    clienteNome: "Julia Costa",
-    data: new Date(Date.now() - 86400000), // ontem
-    hora: "16:00",
-    servico: "Manicure Simples",
-    preco: 25.0,
-    status: "concluido",
-  },
-]
+    if (error) {
+      console.error("Erro ao buscar clientes:", error)
+      return []
+    }
 
-const portfolioMock: FotoPortfolio[] = [
-  {
-    id: "1",
-    url: "/placeholder-nj0e1.png",
-    descricao: "Nail art com flores delicadas",
-    dataUpload: new Date("2024-03-01"),
-  },
-  {
-    id: "2",
-    url: "/elegant-french-manicure.png",
-    descricao: "Francesinha clássica elegante",
-    dataUpload: new Date("2024-03-05"),
-  },
-  {
-    id: "3",
-    url: "/colorful-geometric-nails.png",
-    descricao: "Design geométrico colorido",
-    dataUpload: new Date("2024-03-10"),
-  },
-]
-
-const servicosMock: Servico[] = [
-  {
-    id: "1",
-    nome: "Manicure Simples",
-    preco: 25.0,
-    duracao: 30,
-  },
-  {
-    id: "2",
-    nome: "Esmaltação Gel",
-    preco: 45.0,
-    duracao: 45,
-  },
-  {
-    id: "3",
-    nome: "Alongamento + Decoração",
-    preco: 80.0,
-    duracao: 90,
-  },
-  {
-    id: "4",
-    nome: "Francesinha",
-    preco: 35.0,
-    duracao: 40,
-  },
-  {
-    id: "5",
-    nome: "Nail Art",
-    preco: 60.0,
-    duracao: 60,
-  },
-]
-
-// Funções para gerenciar dados localmente
-export const getClientes = (): Cliente[] => {
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("nail-designer-clientes")
-    return stored ? JSON.parse(stored) : clientesMock
-  }
-  return clientesMock
-}
-
-export const saveClientes = (clientes: Cliente[]) => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("nail-designer-clientes", JSON.stringify(clientes))
+    return data || []
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return []
   }
 }
 
-export const getAgendamentos = (): Agendamento[] => {
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("nail-designer-agendamentos")
-    return stored ? JSON.parse(stored) : agendamentosMock
-  }
-  return agendamentosMock
-}
+export const saveCliente = async (cliente: Omit<Cliente, "id" | "created_at">): Promise<Cliente | null> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("clientes").insert([cliente]).select().single()
 
-export const saveAgendamentos = (agendamentos: Agendamento[]) => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("nail-designer-agendamentos", JSON.stringify(agendamentos))
-  }
-}
+    if (error) {
+      console.error("Erro ao salvar cliente:", error)
+      return null
+    }
 
-export const getPortfolio = (): FotoPortfolio[] => {
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("nail-designer-portfolio")
-    return stored ? JSON.parse(stored) : portfolioMock
-  }
-  return portfolioMock
-}
-
-export const savePortfolio = (portfolio: FotoPortfolio[]) => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("nail-designer-portfolio", JSON.stringify(portfolio))
+    return data
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return null
   }
 }
 
-export const getServicos = (): Servico[] => {
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("nail-designer-servicos")
-    return stored ? JSON.parse(stored) : servicosMock
+export const updateCliente = async (id: string, cliente: Partial<Cliente>): Promise<Cliente | null> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("clientes").update(cliente).eq("id", id).select().single()
+
+    if (error) {
+      console.error("Erro ao atualizar cliente:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return null
   }
-  return servicosMock
 }
 
-export const saveServicos = (servicos: Servico[]) => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("nail-designer-servicos", JSON.stringify(servicos))
+export const deleteCliente = async (id: string): Promise<boolean> => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("clientes").delete().eq("id", id)
+
+    if (error) {
+      console.error("Erro ao deletar cliente:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return false
   }
 }
 
-// Funções utilitárias
-export const getAgendamentosHoje = (): Agendamento[] => {
-  const agendamentos = getAgendamentos()
-  const hoje = new Date()
-  return agendamentos.filter((agendamento) => {
-    const dataAgendamento = new Date(agendamento.data)
-    return dataAgendamento.toDateString() === hoje.toDateString()
-  })
+export const getAgendamentos = async (): Promise<Agendamento[]> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select(`
+        *,
+        clientes(nome),
+        servicos(nome, preco)
+      `)
+      .order("data_agendamento", { ascending: true })
+      .order("hora_agendamento", { ascending: true })
+
+    if (error) {
+      console.error("Erro ao buscar agendamentos:", error)
+      return []
+    }
+
+    return (
+      data?.map((item) => ({
+        id: item.id,
+        cliente_id: item.cliente_id,
+        clienteNome: item.clientes?.nome,
+        data_agendamento: item.data_agendamento,
+        hora_agendamento: item.hora_agendamento,
+        servico_id: item.servico_id,
+        servico: item.servicos?.nome,
+        preco: item.servicos?.preco || item.preco || 0,
+        status: item.status,
+        observacoes: item.observacoes,
+        created_at: item.created_at,
+      })) || []
+    )
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return []
+  }
 }
 
-export const getReceitaTotal = (): number => {
-  const agendamentos = getAgendamentos()
-  return agendamentos
-    .filter((agendamento) => agendamento.status === "concluido")
-    .reduce((total, agendamento) => total + agendamento.preco, 0)
+export const saveAgendamento = async (
+  agendamento: Omit<Agendamento, "id" | "created_at" | "clienteNome" | "servico">,
+): Promise<Agendamento | null> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .insert([agendamento])
+      .select(`
+      *,
+      clientes(nome),
+      servicos(nome, preco)
+    `)
+      .single()
+
+    if (error) {
+      console.error("Erro ao salvar agendamento:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      cliente_id: data.cliente_id,
+      clienteNome: data.clientes?.nome,
+      data_agendamento: data.data_agendamento,
+      hora_agendamento: data.hora_agendamento,
+      servico_id: data.servico_id,
+      servico: data.servicos?.nome,
+      preco: data.servicos?.preco || data.preco || 0,
+      status: data.status,
+      observacoes: data.observacoes,
+      created_at: data.created_at,
+    }
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return null
+  }
+}
+
+export const updateAgendamento = async (id: string, agendamento: Partial<Agendamento>): Promise<Agendamento | null> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .update(agendamento)
+      .eq("id", id)
+      .select(`
+      *,
+      clientes(nome),
+      servicos(nome, preco)
+    `)
+      .single()
+
+    if (error) {
+      console.error("Erro ao atualizar agendamento:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      cliente_id: data.cliente_id,
+      clienteNome: data.clientes?.nome,
+      data_agendamento: data.data_agendamento,
+      hora_agendamento: data.hora_agendamento,
+      servico_id: data.servico_id,
+      servico: data.servicos?.nome,
+      preco: data.servicos?.preco || data.preco || 0,
+      status: data.status,
+      observacoes: data.observacoes,
+      created_at: data.created_at,
+    }
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return null
+  }
+}
+
+export const deleteAgendamento = async (id: string): Promise<boolean> => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("agendamentos").delete().eq("id", id)
+
+    if (error) {
+      console.error("Erro ao deletar agendamento:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return false
+  }
+}
+
+export const getServicos = async (): Promise<Servico[]> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("servicos").select("*").order("nome", { ascending: true })
+
+    if (error) {
+      console.error("Erro ao buscar serviços:", error)
+      return []
+    }
+
+    return data || []
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return []
+  }
+}
+
+export const saveServico = async (servico: Omit<Servico, "id" | "created_at">): Promise<Servico | null> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("servicos").insert([servico]).select().single()
+
+    if (error) {
+      console.error("Erro ao salvar serviço:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return null
+  }
+}
+
+export const updateServico = async (id: string, servico: Partial<Servico>): Promise<Servico | null> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("servicos").update(servico).eq("id", id).select().single()
+
+    if (error) {
+      console.error("Erro ao atualizar serviço:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return null
+  }
+}
+
+export const deleteServico = async (id: string): Promise<boolean> => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("servicos").delete().eq("id", id)
+
+    if (error) {
+      console.error("Erro ao deletar serviço:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return false
+  }
+}
+
+export const getPortfolio = async (): Promise<FotoPortfolio[]> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("portfolio").select("*").order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Erro ao buscar portfólio:", error)
+      return []
+    }
+
+    return data || []
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return []
+  }
+}
+
+export const savePortfolio = async (foto: Omit<FotoPortfolio, "id" | "created_at">): Promise<FotoPortfolio | null> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("portfolio").insert([foto]).select().single()
+
+    if (error) {
+      console.error("Erro ao salvar foto do portfólio:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return null
+  }
+}
+
+export const deletePortfolio = async (id: string): Promise<boolean> => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("portfolio").delete().eq("id", id)
+
+    if (error) {
+      console.error("Erro ao deletar foto do portfólio:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return false
+  }
+}
+
+export const getAgendamentosHoje = async (): Promise<Agendamento[]> => {
+  try {
+    const hoje = new Date().toISOString().split("T")[0]
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select(`
+        *,
+        clientes(nome),
+        servicos(nome, preco)
+      `)
+      .eq("data_agendamento", hoje)
+      .order("hora_agendamento", { ascending: true })
+
+    if (error) {
+      console.error("Erro ao buscar agendamentos de hoje:", error)
+      return []
+    }
+
+    return (
+      data?.map((item) => ({
+        id: item.id,
+        cliente_id: item.cliente_id,
+        clienteNome: item.clientes?.nome,
+        data_agendamento: item.data_agendamento,
+        hora_agendamento: item.hora_agendamento,
+        servico_id: item.servico_id,
+        servico: item.servicos?.nome,
+        preco: item.servicos?.preco || item.preco || 0,
+        status: item.status,
+        observacoes: item.observacoes,
+        created_at: item.created_at,
+      })) || []
+    )
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return []
+  }
+}
+
+export const getReceitaTotal = async (): Promise<number> => {
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select(`
+        servicos(preco)
+      `)
+      .eq("status", "concluido")
+
+    if (error) {
+      console.error("Erro ao calcular receita total:", error)
+      return 0
+    }
+
+    return data?.reduce((total, item) => total + (item.servicos?.preco || 0), 0) || 0
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return 0
+  }
 }
