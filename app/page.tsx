@@ -20,10 +20,11 @@ import {
   Plus,
   Edit,
   Trash2,
-  Phone,
   CheckCircle,
   XCircle,
   DollarSign,
+  Check,
+  X,
 } from "lucide-react"
 import {
   getClientes,
@@ -53,6 +54,22 @@ export default function Dashboard() {
   })
   const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null)
   const [isAgendamentoDialogOpen, setIsAgendamentoDialogOpen] = useState(false)
+  const [agendamentosHoje, setAgendamentosHoje] = useState([
+    {
+      id: "1",
+      cliente: "Maria Silva",
+      servico: "Manicure",
+      horario: "14:00",
+      status: "agendado",
+    },
+    {
+      id: "2",
+      cliente: "Ana Souza",
+      servico: "Pedicure",
+      horario: "15:30",
+      status: "agendado",
+    },
+  ])
 
   const updateStats = () => {
     const clientes = getClientes()
@@ -84,145 +101,221 @@ export default function Dashboard() {
     updateStats()
   }, [])
 
-  const renderDashboard = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-rose-900 mb-2">Dashboard</h1>
-          <p className="text-rose-600">Visão geral do seu negócio</p>
+  const updateAgendamentoStatus = (id: string, status: "concluido" | "cancelado") => {
+    setAgendamentosHoje((prevAgendamentos) =>
+      prevAgendamentos.map((agendamento) => (agendamento.id === id ? { ...agendamento, status } : agendamento)),
+    )
+  }
+
+  const renderDashboard = () => {
+    return (
+      <div className="space-y-6">
+        {/* Melhorando responsividade do cabeçalho para mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-rose-900 mb-2">Dashboard</h1>
+            <p className="text-rose-600">Visão geral do seu negócio</p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-sm text-rose-600">Hoje</p>
+            <p className="text-lg font-semibold text-rose-900">
+              {new Date().toLocaleDateString("pt-BR", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </p>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-rose-600">Hoje</p>
-          <p className="text-lg font-semibold text-rose-900">
-            {new Date().toLocaleDateString("pt-BR", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-rose-700">Total de Clientes</CardTitle>
+              <Users className="h-4 w-4 text-rose-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl sm:text-2xl font-bold text-rose-900">{stats.totalClientes}</div>
+              <p className="text-xs text-rose-600">+{stats.clientesNovos} novos este mês</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-amber-700">Agendamentos Hoje</CardTitle>
+              <Clock className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl sm:text-2xl font-bold text-amber-900">{stats.agendamentosHoje}</div>
+              <p className="text-xs text-amber-600">Atendimentos do dia</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 sm:col-span-2 lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-emerald-700">Receita do Mês</CardTitle>
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl sm:text-2xl font-bold text-emerald-900">R$ {stats.receitaMes.toFixed(2)}</div>
+              <p className="text-xs text-emerald-600">Total: R$ {stats.receitaTotal.toFixed(2)}</p>
+            </CardContent>
+          </Card>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-rose-700">Total de Clientes</CardTitle>
-            <Users className="h-4 w-4 text-rose-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-rose-900">{stats.totalClientes}</div>
-            <p className="text-xs text-rose-600">+{stats.clientesNovos} novos este mês</p>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+          <Card className="border-rose-200">
+            <CardHeader>
+              <CardTitle className="text-rose-900 flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Meta Mensal
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-rose-700">Receita</span>
+                  <span className="text-rose-900">R$ {stats.receitaMes.toFixed(2)} / R$ 2.000,00</span>
+                </div>
+                <Progress value={(stats.receitaMes / 2000) * 100} className="h-2" />
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-rose-700">Novos Clientes</span>
+                  <span className="text-rose-900">{stats.clientesNovos} / 10</span>
+                </div>
+                <Progress value={(stats.clientesNovos / 10) * 100} className="h-2" />
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-rose-700">Fotos no Portfólio</span>
+                  <span className="text-rose-900">{stats.totalFotos} / 20</span>
+                </div>
+                <Progress value={(stats.totalFotos / 20) * 100} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-amber-700">Agendamentos Hoje</CardTitle>
-            <Clock className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-900">{stats.agendamentosHoje}</div>
-            <p className="text-xs text-amber-600">Atendimentos do dia</p>
-          </CardContent>
-        </Card>
+          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-violet-50">
+            <CardHeader>
+              <CardTitle className="text-purple-900 flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Resumo Rápido
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-purple-700">Portfólio</span>
+                <Badge variant="secondary" className="bg-purple-200 text-purple-800">
+                  {stats.totalFotos} fotos
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-purple-700">Receita Total</span>
+                <Badge variant="secondary" className="bg-emerald-200 text-emerald-800">
+                  R$ {stats.receitaTotal.toFixed(2)}
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-purple-700">Base de Clientes</span>
+                <Badge variant="secondary" className="bg-rose-200 text-rose-800">
+                  {stats.totalClientes} clientes
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-700">Receita do Mês</CardTitle>
-            <TrendingUp className="h-4 w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-900">R$ {stats.receitaMes.toFixed(2)}</div>
-            <p className="text-xs text-emerald-600">Total: R$ {stats.receitaTotal.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border-rose-200">
           <CardHeader>
-            <CardTitle className="text-rose-900 flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Meta Mensal
+            <CardTitle className="text-rose-900 flex items-center gap-2 text-lg">
+              <Clock className="h-5 w-5" />
+              Agendamentos de Hoje
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-rose-700">Receita</span>
-                <span className="text-rose-900">R$ {stats.receitaMes.toFixed(2)} / R$ 2.000,00</span>
-              </div>
-              <Progress value={(stats.receitaMes / 2000) * 100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-rose-700">Novos Clientes</span>
-                <span className="text-rose-900">{stats.clientesNovos} / 10</span>
-              </div>
-              <Progress value={(stats.clientesNovos / 10) * 100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-rose-700">Fotos no Portfólio</span>
-                <span className="text-rose-900">{stats.totalFotos} / 20</span>
-              </div>
-              <Progress value={(stats.totalFotos / 20) * 100} className="h-2" />
+          <CardContent>
+            <div className="space-y-3">
+              {agendamentosHoje.length === 0 ? (
+                <p className="text-rose-600 text-center py-4">Nenhum agendamento para hoje</p>
+              ) : (
+                agendamentosHoje.map((agendamento) => (
+                  <div
+                    key={agendamento.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-rose-50 rounded-lg gap-3"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-rose-900 text-sm sm:text-base">{agendamento.cliente}</p>
+                      <p className="text-rose-600 text-xs sm:text-sm">
+                        {agendamento.servico} - {agendamento.horario}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateAgendamentoStatus(agendamento.id, "concluido")}
+                        className="border-green-300 text-green-700 hover:bg-green-50 flex-1 sm:flex-none"
+                        disabled={agendamento.status !== "agendado"}
+                      >
+                        <Check className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Atendido</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateAgendamentoStatus(agendamento.id, "cancelado")}
+                        className="border-red-300 text-red-700 hover:bg-red-50 flex-1 sm:flex-none"
+                        disabled={agendamento.status !== "agendado"}
+                      >
+                        <X className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Cancelar</span>
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-violet-50">
+        <Card className="border-rose-200">
           <CardHeader>
-            <CardTitle className="text-purple-900 flex items-center gap-2">
+            <CardTitle className="text-rose-900 flex items-center gap-2 text-lg">
               <Camera className="h-5 w-5" />
-              Resumo Rápido
+              Portfólio Recente
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-purple-700">Portfólio</span>
-              <Badge variant="secondary" className="bg-purple-200 text-purple-800">
-                {stats.totalFotos} fotos
-              </Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-purple-700">Receita Total</span>
-              <Badge variant="secondary" className="bg-emerald-200 text-emerald-800">
-                R$ {stats.receitaTotal.toFixed(2)}
-              </Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-purple-700">Base de Clientes</span>
-              <Badge variant="secondary" className="bg-rose-200 text-rose-800">
-                {stats.totalClientes} clientes
-              </Badge>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <img
+                src="/classic-french-manicure.png"
+                alt="Classic French Manicure"
+                className="aspect-square object-cover rounded-md"
+              />
+              <img src="/floral-nail-art.png" alt="Floral Nail Art" className="aspect-square object-cover rounded-md" />
+              <img
+                src="/glitter-nail-art-sparkly.png"
+                alt="Glitter Nail Art Sparkly"
+                className="aspect-square object-cover rounded-md"
+              />
+              <img
+                src="/minimalist-nude-nails.png"
+                alt="Minimalist Nude Nails"
+                className="aspect-square object-cover rounded-md"
+              />
+              <img
+                src="/ombre-nail-gradient.png"
+                alt="Ombre Nail Gradient"
+                className="aspect-square object-cover rounded-md"
+              />
+              <img src="/placeholder-6unsb.png" alt="Placeholder" className="aspect-square object-cover rounded-md" />
             </div>
           </CardContent>
         </Card>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-rose-200">
-          <CardHeader>
-            <CardTitle className="text-rose-900">Agendamentos de Hoje</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AgendamentosHoje onUpdate={updateStats} />
-          </CardContent>
-        </Card>
-
-        <Card className="border-rose-200">
-          <CardHeader>
-            <CardTitle className="text-rose-900">Portfólio Recente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PortfolioRecente />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
+    )
+  }
 
   const handleScheduleFromClient = (clienteId: string) => {
     setSelectedClienteId(clienteId)
@@ -470,6 +563,28 @@ function CadastroClientes({
     setEditingCliente(null)
   }
 
+  const agendarParaCliente = (cliente: Cliente) => {
+    onSchedule?.(cliente.id)
+  }
+
+  const editCliente = (cliente: Cliente) => {
+    setEditingCliente(cliente)
+    setFormData({
+      nome: cliente.nome,
+      telefone: cliente.telefone,
+    })
+    setIsDialogOpen(true)
+  }
+
+  const deleteCliente = (clienteId: string) => {
+    if (confirm("Tem certeza que deseja excluir este cliente?")) {
+      const updatedClientes = clientes.filter((c) => c.id !== clienteId)
+      setClientes(updatedClientes)
+      saveClientes(updatedClientes)
+      onUpdate?.()
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -519,11 +634,16 @@ function CadastroClientes({
                   className="border-rose-200 focus:border-rose-400"
                 />
               </div>
-              <div className="flex gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+              <div className="flex flex-col sm:flex-row gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  className="flex-1 order-2 sm:order-1"
+                >
                   Cancelar
                 </Button>
-                <Button type="submit" className="flex-1 bg-rose-600 hover:bg-rose-700 text-white">
+                <Button type="submit" className="flex-1 bg-rose-600 hover:bg-rose-700 text-white order-1 sm:order-2">
                   {editingCliente ? "Salvar" : "Cadastrar"}
                 </Button>
               </div>
@@ -547,52 +667,43 @@ function CadastroClientes({
               <p className="text-sm">Clique em "Novo Cliente" para começar</p>
             </div>
           ) : (
+            /* Melhorando responsividade da lista de clientes */
             <div className="space-y-3">
               {clientes.map((cliente) => (
                 <div
                   key={cliente.id}
-                  className="flex items-center justify-between p-4 bg-rose-50 rounded-lg border border-rose-100"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-rose-200 rounded-lg bg-rose-50 gap-3"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-rose-200 rounded-full flex items-center justify-center">
-                      <Users className="h-5 w-5 text-rose-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-rose-900">{cliente.nome}</p>
-                      <p className="text-sm text-rose-600 flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {cliente.telefone}
-                      </p>
-                    </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-rose-900">{cliente.nome}</h3>
+                    <p className="text-rose-600 text-sm">{cliente.telefone}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-rose-200 text-rose-800">
-                      {new Date(cliente.dataCadastro).toLocaleDateString("pt-BR")}
-                    </Badge>
+                  <div className="flex gap-2">
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={() => onSchedule?.(cliente.id)}
-                      className="border-green-200 text-green-600 hover:bg-green-50"
-                      title="Agendar serviço"
+                      onClick={() => agendarParaCliente(cliente)}
+                      className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none"
                     >
-                      <Calendar className="h-3 w-3" />
+                      <Calendar className="h-3 w-3 sm:mr-1" />
+                      <span className="sm:inline">Agendar</span>
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleEdit(cliente)}
-                      className="border-rose-200 text-rose-600 hover:bg-rose-50"
+                      onClick={() => editCliente(cliente)}
+                      className="border-rose-300 text-rose-700 hover:bg-rose-50 flex-1 sm:flex-none"
                     >
-                      <Edit className="h-3 w-3" />
+                      <Edit className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Editar</span>
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleDelete(cliente.id)}
-                      className="border-red-200 text-red-600 hover:bg-red-50"
+                      onClick={() => deleteCliente(cliente.id)}
+                      className="border-red-300 text-red-700 hover:bg-red-50 flex-1 sm:flex-none"
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Excluir</span>
                     </Button>
                   </div>
                 </div>
@@ -1053,6 +1164,24 @@ function GaleriaPortfolio({ onUpdate }: { onUpdate?: () => void }) {
 
   const fotosOrdenadas = fotos.sort((a, b) => new Date(b.dataUpload).getTime() - new Date(a.dataUpload).getTime())
 
+  const editFoto = (foto: any) => {
+    setEditingFoto(foto)
+    setFormData({
+      descricao: foto.descricao,
+      url: foto.url,
+    })
+    setIsDialogOpen(true)
+  }
+
+  const deleteFoto = (fotoId: string) => {
+    if (confirm("Tem certeza que deseja excluir esta foto?")) {
+      const updatedFotos = fotos.filter((foto) => foto.id !== fotoId)
+      setFotos(updatedFotos)
+      savePortfolio(updatedFotos)
+      onUpdate?.()
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1133,7 +1262,8 @@ function GaleriaPortfolio({ onUpdate }: { onUpdate?: () => void }) {
               <p className="text-sm">Clique em "Adicionar Foto" para começar</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            /* Melhorando responsividade da galeria de fotos */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
               {fotosOrdenadas.map((foto) => (
                 <div key={foto.id} className="group relative">
                   <div className="aspect-square overflow-hidden rounded-lg bg-rose-100">
@@ -1145,28 +1275,30 @@ function GaleriaPortfolio({ onUpdate }: { onUpdate?: () => void }) {
                     />
                   </div>
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 sm:gap-2">
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => handleEdit(foto)}
-                        className="bg-white text-rose-600 hover:bg-rose-50"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          editFoto(foto)
+                        }}
+                        className="bg-white/90 hover:bg-white text-rose-700 border-rose-300 h-8 w-8 p-0"
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => handleDelete(foto.id)}
-                        className="bg-white text-red-600 hover:bg-red-50"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteFoto(foto.id)
+                        }}
+                        className="bg-white/90 hover:bg-white text-red-700 border-red-300 h-8 w-8 p-0"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <p className="text-sm font-medium text-rose-900 truncate">{foto.descricao}</p>
-                    <p className="text-xs text-rose-600">{new Date(foto.dataUpload).toLocaleDateString("pt-BR")}</p>
                   </div>
                 </div>
               ))}
