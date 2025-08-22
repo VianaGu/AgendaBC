@@ -50,6 +50,7 @@ import {
   saveServico,
   updateServico,
   deleteServico,
+  checkCpfExists,
   type Cliente,
   type Agendamento,
   type FotoPortfolio,
@@ -69,7 +70,10 @@ export default function Dashboard() {
   const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null)
   const [isAgendamentoDialogOpen, setIsAgendamentoDialogOpen] = useState(false)
   const [agendamentosHoje, setAgendamentosHoje] = useState<Agendamento[]>([])
-  const [clienteAtual, setClienteAtual] = useState<Agendamento | null>(null)
+  const [clienteAtual, setClienteAtual] = useState<{
+    cliente: string
+    agendamentos: (Agendamento & { servicoNome?: string; servicoPreco?: number })[]
+  } | null>(null)
 
   const updateStats = async () => {
     try {
@@ -112,7 +116,7 @@ export default function Dashboard() {
       setAgendamentosHoje((prevAgendamentos) =>
         prevAgendamentos.map((agendamento) => (agendamento.id === id ? { ...agendamento, status } : agendamento)),
       )
-      if (clienteAtual?.id === id) {
+      if (clienteAtual?.cliente === id) {
         setClienteAtual(null)
       }
       updateStats()
@@ -124,17 +128,32 @@ export default function Dashboard() {
   const iniciarAtendimento = async (agendamento: Agendamento) => {
     try {
       const servicos = await getServicos()
-      const servico = servicos.find((s) => s.id === agendamento.servico_id)
+      const agendamentos = await getAgendamentos()
 
-      const agendamentoCompleto = {
-        ...agendamento,
-        servicoPreco: servico?.preco || 0,
-      }
+      // Buscar todos os agendamentos do mesmo cliente na mesma data
+      const agendamentosDoCliente = agendamentos.filter(
+        (a) =>
+          a.cliente_id === agendamento.cliente_id &&
+          a.data_agendamento === agendamento.data_agendamento &&
+          a.status === "agendado",
+      )
 
-      setClienteAtual(agendamentoCompleto)
+      // Enriquecer cada agendamento com dados do serviço
+      const agendamentosCompletos = agendamentosDoCliente.map((ag) => {
+        const servico = servicos.find((s) => s.id === ag.servico_id)
+        return {
+          ...ag,
+          servicoNome: servico?.nome || "Serviço não encontrado",
+          servicoPreco: servico?.preco || 0,
+        }
+      })
+
+      setClienteAtual({
+        cliente: agendamento.clienteNome,
+        agendamentos: agendamentosCompletos,
+      })
     } catch (error) {
-      console.error("Erro ao buscar dados do serviço:", error)
-      setClienteAtual(agendamento)
+      console.error("Erro ao buscar dados dos serviços:", error)
     }
   }
 
@@ -169,23 +188,48 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-green-600 font-medium">Cliente</p>
-                  <p className="text-lg font-semibold text-green-900">{clienteAtual.clienteNome}</p>
+              <div className="mb-4">
+                <p className="text-sm text-green-600 font-medium">Cliente</p>
+                <p className="text-xl font-semibold text-green-900">{clienteAtual.cliente}</p>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm text-green-600 font-medium mb-3">Serviços Contratados</p>
+                <div className="space-y-2">
+                  {clienteAtual.agendamentos.map((agendamento, index) => (
+                    <div
+                      key={agendamento.id}
+                      className="flex justify-between items-center bg-white p-3 rounded-lg border border-green-200"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-green-900">{agendamento.servicoNome}</p>
+                        <p className="text-sm text-green-600">{agendamento.horario}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-green-900">R$ {agendamento.servicoPreco?.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-sm text-green-600 font-medium">Serviço</p>
-                  <p className="text-lg font-semibold text-green-900">{clienteAtual.servicoNome}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-green-600 font-medium">Valor</p>
-                  <p className="text-lg font-semibold text-green-900">R$ {clienteAtual.servicoPreco?.toFixed(2)}</p>
+
+                <div className="mt-3 pt-3 border-t border-green-200">
+                  <div className="flex justify-between items-center">
+                    <p className="font-medium text-green-800">Total do Atendimento:</p>
+                    <p className="text-xl font-bold text-green-900">
+                      R$ {clienteAtual.agendamentos.reduce((total, ag) => total + (ag.servicoPreco || 0), 0).toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
-                  onClick={() => updateAgendamentoStatus(clienteAtual.id, "concluido")}
+                  onClick={() => {
+                    clienteAtual.agendamentos.forEach((ag) => {
+                      updateAgendamentoStatus(ag.id, "concluido")
+                    })
+                    setClienteAtual(null)
+                  }}
                   className="bg-green-600 hover:bg-green-700 text-white flex-1"
                 >
                   <Check className="h-4 w-4 mr-2" />
@@ -294,80 +338,72 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="text-rose-900 flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Agendamentos de Hoje ({agendamentosHoje.length})
+                Agendamentos de Hoje ({agendamentosHoje.filter((a) => a.status !== "concluido").length})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {agendamentosHoje.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">Nenhum agendamento para hoje</p>
+              {agendamentosHoje.filter((agendamento) => agendamento.status !== "concluido").length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Nenhum agendamento pendente para hoje</p>
               ) : (
                 <div className="space-y-3">
-                  {agendamentosHoje.map((agendamento) => (
-                    <div
-                      key={agendamento.id}
-                      className={`
+                  {agendamentosHoje
+                    .filter((agendamento) => agendamento.status !== "concluido")
+                    .map((agendamento) => (
+                      <div
+                        key={agendamento.id}
+                        className={`
                       p-3 sm:p-4 rounded-lg border-l-4 
-                      ${
-                        agendamento.status === "concluido"
-                          ? "bg-green-50 border-green-400"
-                          : agendamento.status === "cancelado"
-                            ? "bg-red-50 border-red-400"
-                            : "bg-blue-50 border-blue-400"
-                      }
+                      ${agendamento.status === "cancelado" ? "bg-red-50 border-red-400" : "bg-blue-50 border-blue-400"}
                     `}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                            <span className="font-semibold text-gray-900">{agendamento.hora_agendamento}</span>
-                            <span className="text-gray-700">{agendamento.clienteNome}</span>
-                            <span className="text-sm text-gray-600">{agendamento.servicoNome}</span>
-                            <span className="text-sm font-medium text-green-600">
-                              R$ {agendamento.servicoPreco?.toFixed(2)}
-                            </span>
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                              <span className="font-semibold text-gray-900">{agendamento.hora_agendamento}</span>
+                              <span className="text-gray-700">{agendamento.clienteNome}</span>
+                            </div>
+                            {agendamento.observacoes && (
+                              <p className="text-sm text-gray-600 mt-1">{agendamento.observacoes}</p>
+                            )}
                           </div>
-                          {agendamento.observacoes && (
-                            <p className="text-sm text-gray-600 mt-1">{agendamento.observacoes}</p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {agendamento.status === "agendado" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => iniciarAtendimento(agendamento)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white"
-                                disabled={clienteAtual !== null}
-                              >
-                                <Play className="h-4 w-4 mr-1" />
-                                Iniciar
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => updateAgendamentoStatus(agendamento.id, "concluido")}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => updateAgendamentoStatus(agendamento.id, "cancelado")}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          {agendamento.status === "concluido" && (
-                            <span className="text-green-600 font-medium text-sm">✓ Concluído</span>
-                          )}
-                          {agendamento.status === "cancelado" && (
-                            <span className="text-red-600 font-medium text-sm">✗ Cancelado</span>
-                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {agendamento.status === "agendado" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => iniciarAtendimento(agendamento)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  disabled={clienteAtual !== null}
+                                >
+                                  <Play className="h-4 w-4 mr-1" />
+                                  Iniciar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateAgendamentoStatus(agendamento.id, "concluido")}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => updateAgendamentoStatus(agendamento.id, "cancelado")}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            {agendamento.status === "concluido" && (
+                              <span className="text-green-600 font-medium text-sm">✓ Concluído</span>
+                            )}
+                            {agendamento.status === "cancelado" && (
+                              <span className="text-red-600 font-medium text-sm">✗ Cancelado</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </CardContent>
@@ -487,6 +523,7 @@ function CadastroClientes({
   const [formData, setFormData] = useState({
     nome: "",
     telefone: "",
+    cpf: "",
   })
 
   const loadClientes = async () => {
@@ -501,12 +538,24 @@ function CadastroClientes({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.nome || !formData.telefone) {
+    if (!formData.nome || !formData.telefone || !formData.cpf) {
       alert("Por favor, preencha todos os campos")
       return
     }
 
+    const cpfLimpo = formData.cpf.replace(/\D/g, "")
+    if (cpfLimpo.length !== 11) {
+      alert("CPF deve ter 11 dígitos")
+      return
+    }
+
     try {
+      const cpfExiste = await checkCpfExists(formData.cpf, editingCliente?.id)
+      if (cpfExiste) {
+        alert("Já existe um cliente cadastrado com este CPF")
+        return
+      }
+
       if (editingCliente) {
         const clienteAtualizado = await updateCliente(editingCliente.id, formData)
         if (clienteAtualizado) {
@@ -519,7 +568,7 @@ function CadastroClientes({
         }
       }
 
-      setFormData({ nome: "", telefone: "" })
+      setFormData({ nome: "", telefone: "", cpf: "" })
       setEditingCliente(null)
       onUpdate?.()
     } catch (error) {
@@ -533,7 +582,18 @@ function CadastroClientes({
     setFormData({
       nome: cliente.nome,
       telefone: cliente.telefone,
+      cpf: cliente.cpf,
     })
+  }
+
+  const formatCpf = (value: string) => {
+    const cpf = value.replace(/\D/g, "")
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+  }
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCpf(e.target.value)
+    setFormData({ ...formData, cpf: formatted })
   }
 
   const handleDelete = async (id: string) => {
@@ -580,6 +640,16 @@ function CadastroClientes({
                   placeholder="(11) 99999-9999"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="cpf">CPF</Label>
+                <Input
+                  id="cpf"
+                  value={formData.cpf}
+                  onChange={handleCpfChange}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                />
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button type="submit" className="bg-rose-600 hover:bg-rose-700">
@@ -591,7 +661,7 @@ function CadastroClientes({
                   variant="outline"
                   onClick={() => {
                     setEditingCliente(null)
-                    setFormData({ nome: "", telefone: "" })
+                    setFormData({ nome: "", telefone: "", cpf: "" })
                   }}
                 >
                   Cancelar
@@ -619,6 +689,7 @@ function CadastroClientes({
                   <div className="flex-1">
                     <p className="font-medium text-rose-900">{cliente.nome}</p>
                     <p className="text-rose-600 text-sm">{cliente.telefone}</p>
+                    <p className="text-rose-500 text-xs">CPF: {cliente.cpf}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -670,6 +741,7 @@ function SistemaAgendamentos({
   const [servicos, setServicos] = useState<Servico[]>([])
   const [editingAgendamento, setEditingAgendamento] = useState<Agendamento | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [isBlockingMode, setIsBlockingMode] = useState(false)
   const [blockedDates, setBlockedDates] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("blockedDates")
@@ -730,20 +802,33 @@ function SistemaAgendamentos({
     }
   }
 
+  const formatDateForInput = (date: Date) => {
+    if (!date || isNaN(date.getTime())) {
+      throw new Error("Data inválida fornecida para formatDate")
+    }
+    return date.toISOString().split("T")[0]
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (isDateBlocked(new Date(formData.data_agendamento))) {
+    if (!formData.data_agendamento) {
+      alert("Por favor, selecione uma data para o agendamento")
+      return
+    }
+
+    const dataAgendamento = new Date(formData.data_agendamento)
+    if (isNaN(dataAgendamento.getTime())) {
+      alert("Data de agendamento inválida")
+      return
+    }
+
+    if (isDateBlocked(dataAgendamento)) {
       alert("Esta data está bloqueada para agendamentos!")
       return
     }
 
-    if (
-      !formData.cliente_id ||
-      !formData.data_agendamento ||
-      !formData.hora_agendamento ||
-      formData.servico_ids.length === 0
-    ) {
+    if (!formData.cliente_id || !formData.hora_agendamento || formData.servico_ids.length === 0) {
       alert("Por favor, preencha todos os campos obrigatórios")
       return
     }
@@ -838,19 +923,6 @@ function SistemaAgendamentos({
     return blockedDates.includes(formatDate(date))
   }
 
-  const toggleBlockDate = (date: string) => {
-    console.log("[v0] Toggling block for date:", date)
-    console.log("[v0] Current blocked dates:", blockedDates)
-
-    const newBlockedDates = blockedDates.includes(date)
-      ? blockedDates.filter((d) => d !== date)
-      : [...blockedDates, date]
-
-    console.log("[v0] New blocked dates:", newBlockedDates)
-    setBlockedDates(newBlockedDates)
-    localStorage.setItem("blockedDates", JSON.stringify(newBlockedDates))
-  }
-
   const navigateMonth = (direction: "prev" | "next") => {
     setCurrentDate((prev) => {
       const newDate = new Date(prev)
@@ -899,6 +971,23 @@ function SistemaAgendamentos({
           <p className="text-rose-600">Visualize e gerencie sua agenda mensal</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            variant={isBlockingMode ? "destructive" : "outline"}
+            onClick={() => setIsBlockingMode(!isBlockingMode)}
+            className="w-full sm:w-auto"
+          >
+            {isBlockingMode ? (
+              <>
+                <Unlock className="h-4 w-4 mr-2" />
+                Sair do Modo Bloqueio
+              </>
+            ) : (
+              <>
+                <Lock className="h-4 w-4 mr-2" />
+                Modo Bloqueio
+              </>
+            )}
+          </Button>
           <Dialog open={isDialogOpen} onOpenChange={onDialogClose}>
             <DialogTrigger asChild>
               <Button className="bg-rose-600 hover:bg-rose-700 w-full sm:w-auto">
@@ -906,7 +995,7 @@ function SistemaAgendamentos({
                 Novo Agendamento
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md mx-auto">
+            <DialogContent className="max-w-md mx-auto max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingAgendamento ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
               </DialogHeader>
@@ -951,7 +1040,7 @@ function SistemaAgendamentos({
                 </div>
                 <div>
                   <Label htmlFor="servicos">Serviços</Label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
+                  <div className="space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
                     {servicos.map((servico) => (
                       <div key={servico.id} className="flex items-center space-x-2">
                         <input
@@ -979,14 +1068,33 @@ function SistemaAgendamentos({
                       </div>
                     ))}
                   </div>
+
                   {formData.servico_ids.length > 0 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Total: R${" "}
-                      {servicos
-                        .filter((s) => formData.servico_ids.includes(s.id))
-                        .reduce((total, s) => total + s.preco, 0)
-                        .toFixed(2)}
-                    </p>
+                    <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-md">
+                      <h4 className="text-sm font-medium text-rose-800 mb-2">Serviços Selecionados:</h4>
+                      <div className="space-y-1">
+                        {servicos
+                          .filter((s) => formData.servico_ids.includes(s.id))
+                          .map((servico) => (
+                            <div key={servico.id} className="flex justify-between text-sm text-rose-700">
+                              <span>{servico.nome}</span>
+                              <span>R$ {servico.preco.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        <div className="border-t border-rose-300 pt-1 mt-2">
+                          <div className="flex justify-between text-sm font-medium text-rose-800">
+                            <span>Total:</span>
+                            <span>
+                              R${" "}
+                              {servicos
+                                .filter((s) => formData.servico_ids.includes(s.id))
+                                .reduce((total, s) => total + s.preco, 0)
+                                .toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div>
@@ -996,11 +1104,12 @@ function SistemaAgendamentos({
                     value={formData.observacoes}
                     onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
                     placeholder="Observações adicionais (opcional)"
+                    className="min-h-[60px]"
                   />
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button type="submit" className="bg-rose-600 hover:bg-rose-700 flex-1">
-                    {editingAgendamento ? "Atualizar" : "Agendar"}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+                  <Button type="submit" className="bg-rose-600 hover:bg-rose-700 flex-1 h-11">
+                    {editingAgendamento ? "Atualizar Agendamento" : "Confirmar Agendamento"}
                   </Button>
                   <Button
                     type="button"
@@ -1009,7 +1118,7 @@ function SistemaAgendamentos({
                       onDialogClose()
                       resetForm()
                     }}
-                    className="flex-1 bg-transparent"
+                    className="flex-1 h-11"
                   >
                     Cancelar
                   </Button>
@@ -1058,78 +1167,55 @@ function SistemaAgendamentos({
 
           {/* Grid do calendário */}
           <div className="grid grid-cols-7 gap-1">
-            {days.map((day, index) => {
+            {days.map((day) => {
               const dateStr = formatDate(day.date)
               const dayAgendamentos = getAgendamentosForDate(day.date)
-              const isBlocked = isDateBlocked(day.date)
+              const isBlocked = blockedDates.includes(dateStr)
               const isToday = formatDate(new Date()) === dateStr
 
               return (
                 <div
-                  key={index}
+                  key={dateStr}
                   className={`
                     min-h-[80px] sm:min-h-[100px] p-1 sm:p-2 border rounded-lg relative cursor-pointer transition-colors
                     ${day.isCurrentMonth ? "bg-white border-rose-200" : "bg-gray-50 border-gray-200"}
                     ${isToday ? "ring-2 ring-rose-400" : ""}
                     ${isBlocked ? "bg-red-50 border-red-300" : ""}
-                    hover:bg-rose-50
+                    ${isBlockingMode ? "hover:bg-red-50" : "hover:bg-rose-50"}
                   `}
                   onClick={() => {
-                    setSelectedDate(dateStr)
-                    setFormData((prev) => ({ ...prev, data_agendamento: dateStr }))
+                    if (isBlockingMode && day.isCurrentMonth) {
+                      const newBlockedDates = isBlocked
+                        ? blockedDates.filter((d) => d !== dateStr)
+                        : [...blockedDates, dateStr]
+                      setBlockedDates(newBlockedDates)
+                      localStorage.setItem("blockedDates", JSON.stringify(newBlockedDates))
+                    } else if (!isBlocked) {
+                      setSelectedDate(dateStr)
+                      setFormData((prev) => ({ ...prev, data_agendamento: dateStr }))
+                    }
                   }}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span
                       className={`
-                      text-xs sm:text-sm font-medium
-                      ${day.isCurrentMonth ? "text-gray-900" : "text-gray-400"}
-                      ${isToday ? "text-rose-600 font-bold" : ""}
-                    `}
+                        text-xs sm:text-sm font-medium
+                        ${day.isCurrentMonth ? "text-gray-900" : "text-gray-400"}
+                        ${isToday ? "text-rose-600 font-bold" : ""}
+                      `}
                     >
                       {day.date.getDate()}
                     </span>
-
-                    {day.isCurrentMonth && (
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 w-5 p-0 hover:bg-red-100"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleBlockDate(dateStr)
-                          }}
-                          title={isBlocked ? "Desbloquear data" : "Bloquear data"}
-                        >
-                          {isBlocked ? (
-                            <Unlock className="h-3 w-3 text-green-600" />
-                          ) : (
-                            <Lock className="h-3 w-3 text-gray-400" />
-                          )}
-                        </Button>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Agendamentos do dia */}
                   <div className="space-y-1">
-                    {dayAgendamentos.slice(0, 2).map((agendamento) => (
+                    {dayAgendamentos.slice(0, 2).map((agendamento, index) => (
                       <div
-                        key={agendamento.id}
-                        className={`
-                          text-xs p-1 rounded truncate
-                          ${
-                            agendamento.status === "concluido"
-                              ? "bg-green-100 text-green-800"
-                              : agendamento.status === "cancelado"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-blue-100 text-blue-800"
-                          }
-                        `}
-                        title={`${agendamento.clienteNome} - ${agendamento.hora_agendamento}`}
+                        key={index}
+                        className="text-xs p-1 bg-rose-100 text-rose-800 rounded truncate"
+                        title={`${agendamento.cliente_nome} - ${agendamento.hora_agendamento}`}
                       >
-                        {agendamento.hora_agendamento} {agendamento.clienteNome}
+                        {agendamento.cliente_nome}
                       </div>
                     ))}
                     {dayAgendamentos.length > 2 && (
@@ -1140,6 +1226,16 @@ function SistemaAgendamentos({
                   {isBlocked && (
                     <div className="absolute inset-0 bg-red-100 bg-opacity-50 rounded-lg flex items-center justify-center">
                       <Lock className="h-4 w-4 text-red-600" />
+                    </div>
+                  )}
+
+                  {isBlockingMode && day.isCurrentMonth && (
+                    <div className="absolute top-1 right-1">
+                      {isBlocked ? (
+                        <Unlock className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <Lock className="h-3 w-3 text-gray-400" />
+                      )}
                     </div>
                   )}
                 </div>

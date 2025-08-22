@@ -4,6 +4,7 @@ export interface Cliente {
   id: string
   nome: string
   telefone: string
+  cpf: string
   dataCadastro?: Date
   created_at?: string
 }
@@ -417,5 +418,28 @@ export const getReceitaTotal = async (): Promise<number> => {
   } catch (error) {
     console.error("Erro ao conectar com Supabase:", error)
     return 0
+  }
+}
+
+export const checkCpfExists = async (cpf: string, excludeId?: string): Promise<boolean> => {
+  try {
+    const supabase = createClient()
+    let query = supabase.from("clientes").select("id").eq("cpf", cpf)
+
+    if (excludeId) {
+      query = query.neq("id", excludeId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error("Erro ao verificar CPF:", error)
+      return false
+    }
+
+    return (data?.length || 0) > 0
+  } catch (error) {
+    console.error("Erro ao conectar com Supabase:", error)
+    return false
   }
 }
