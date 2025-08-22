@@ -670,7 +670,13 @@ function SistemaAgendamentos({
   const [servicos, setServicos] = useState<Servico[]>([])
   const [editingAgendamento, setEditingAgendamento] = useState<Agendamento | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [blockedDates, setBlockedDates] = useState<string[]>([])
+  const [blockedDates, setBlockedDates] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("blockedDates")
+      return saved ? JSON.parse(saved) : []
+    }
+    return []
+  })
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [showBlockDialog, setShowBlockDialog] = useState(false)
   const [formData, setFormData] = useState({
@@ -833,10 +839,14 @@ function SistemaAgendamentos({
   }
 
   const toggleBlockDate = (date: string) => {
+    console.log("[v0] Toggling block for date:", date)
+    console.log("[v0] Current blocked dates:", blockedDates)
+
     const newBlockedDates = blockedDates.includes(date)
       ? blockedDates.filter((d) => d !== date)
       : [...blockedDates, date]
 
+    console.log("[v0] New blocked dates:", newBlockedDates)
     setBlockedDates(newBlockedDates)
     localStorage.setItem("blockedDates", JSON.stringify(newBlockedDates))
   }
