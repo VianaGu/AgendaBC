@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Calendar,
@@ -520,6 +520,11 @@ function CadastroClientes({
 }: { onUpdate?: () => void; onSchedule: (clienteId: string) => void }) {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [historicoCliente, setHistoricoCliente] = useState<{
+    cliente: Cliente
+    agendamentos: Agendamento[]
+  } | null>(null)
   const [formData, setFormData] = useState({
     nome: "",
     telefone: "",
@@ -606,6 +611,36 @@ function CadastroClientes({
     }
   }
 
+  const clientesFiltrados = clientes.filter((cliente) => {
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      cliente.nome.toLowerCase().includes(searchLower) ||
+      cliente.telefone.includes(searchTerm) ||
+      cliente.cpf.includes(searchTerm)
+    )
+  })
+
+  const carregarHistorico = async (cliente: Cliente) => {
+    try {
+      const agendamentos = await getAgendamentos()
+      const agendamentosCliente = agendamentos
+        .filter((ag) => ag.cliente_id === cliente.id && ag.status === "concluido")
+        .sort((a, b) => {
+          // Ordenar do mais recente para o mais antigo
+          const dataA = new Date(a.data_agendamento + "T" + a.hora_agendamento)
+          const dataB = new Date(b.data_agendamento + "T" + b.hora_agendamento)
+          return dataB.getTime() - dataA.getTime()
+        })
+
+      setHistoricoCliente({
+        cliente,
+        agendamentos: agendamentosCliente,
+      })
+    } catch (error) {
+      console.error("Erro ao carregar histórico:", error)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -675,13 +710,23 @@ function CadastroClientes({
       <Card className="border-rose-200">
         <CardHeader>
           <CardTitle className="text-rose-900">Lista de Clientes</CardTitle>
+          <div className="mt-4">
+            <Input
+              placeholder="Pesquisar por nome, telefone ou CPF..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-md"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {clientes.length === 0 ? (
-              <p className="text-rose-600 text-center py-4">Nenhum cliente cadastrado</p>
+            {clientesFiltrados.length === 0 ? (
+              <p className="text-rose-600 text-center py-4">
+                {searchTerm ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
+              </p>
             ) : (
-              clientes.map((cliente) => (
+              clientesFiltrados.map((cliente) => (
                 <div
                   key={cliente.id}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-rose-50 rounded-lg gap-3"
@@ -692,6 +737,15 @@ function CadastroClientes({
                     <p className="text-rose-500 text-xs">CPF: {cliente.cpf}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => carregarHistorico(cliente)}
+                      className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                    >
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Histórico
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -726,6 +780,58 @@ function CadastroClientes({
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={historicoCliente !== null} onOpenChange={() => setHistoricoCliente(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Histórico de Procedimentos - {historicoCliente?.cliente.nome}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {historicoCliente?.agendamentos.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">Nenhum procedimento realizado ainda</p>
+            ) : (
+              historicoCliente?.agendamentos.map((agendamento) => (
+                <Card key={agendamento.id} className="border-rose-100">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-green-100 text-green-700">Concluído</Badge>
+                          <span className="text-sm text-gray-600">
+                            {new Date(agendamento.data_agendamento).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium text-rose-900">💅 {agendamento.servico}</p>
+                          <p className="text-sm text-rose-600">🕐 {agendamento.hora_agendamento}</p>
+                          <p className="text-sm text-rose-600">💰 R$ {agendamento.preco.toFixed(2)}</p>
+                          {agendamento.observacoes && (
+                            <p className="text-sm text-gray-600 italic">📝 {agendamento.observacoes}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+            {historicoCliente && historicoCliente.agendamentos.length > 0 && (
+              <div className="pt-4 border-t">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-rose-900">Total de Procedimentos:</span>
+                  <span className="text-lg font-bold text-rose-900">{historicoCliente.agendamentos.length}</span>
+                </div>
+                <div className="flex justify-between items-center mt-2">
+                  <span className="font-medium text-rose-900">Valor Total Gasto:</span>
+                  <span className="text-lg font-bold text-rose-900">
+                    R$ {historicoCliente.agendamentos.reduce((total, ag) => total + ag.preco, 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -988,146 +1094,141 @@ function SistemaAgendamentos({
               </>
             )}
           </Button>
-          <Dialog open={isDialogOpen} onOpenChange={onDialogClose}>
-            <DialogTrigger asChild>
-              <Button className="bg-rose-600 hover:bg-rose-700 w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Agendamento
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md mx-auto max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingAgendamento ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="cliente">Cliente</Label>
-                  <Select
-                    value={formData.cliente_id}
-                    onValueChange={(value) => setFormData({ ...formData, cliente_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clientes.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="data">Data</Label>
-                    <Input
-                      id="data"
-                      type="date"
-                      value={formData.data_agendamento}
-                      onChange={(e) => setFormData({ ...formData, data_agendamento: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="hora">Hora</Label>
-                    <Input
-                      id="hora"
-                      type="time"
-                      value={formData.hora_agendamento}
-                      onChange={(e) => setFormData({ ...formData, hora_agendamento: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="servicos">Serviços</Label>
-                  <div className="space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
-                    {servicos.map((servico) => (
-                      <div key={servico.id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`servico-${servico.id}`}
-                          checked={formData.servico_ids.includes(servico.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData({
-                                ...formData,
-                                servico_ids: [...formData.servico_ids, servico.id],
-                              })
-                            } else {
-                              setFormData({
-                                ...formData,
-                                servico_ids: formData.servico_ids.filter((id) => id !== servico.id),
-                              })
-                            }
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <label htmlFor={`servico-${servico.id}`} className="text-sm cursor-pointer flex-1">
-                          {servico.nome} - R$ {servico.preco.toFixed(2)}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-
-                  {formData.servico_ids.length > 0 && (
-                    <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-md">
-                      <h4 className="text-sm font-medium text-rose-800 mb-2">Serviços Selecionados:</h4>
-                      <div className="space-y-1">
-                        {servicos
-                          .filter((s) => formData.servico_ids.includes(s.id))
-                          .map((servico) => (
-                            <div key={servico.id} className="flex justify-between text-sm text-rose-700">
-                              <span>{servico.nome}</span>
-                              <span>R$ {servico.preco.toFixed(2)}</span>
-                            </div>
-                          ))}
-                        <div className="border-t border-rose-300 pt-1 mt-2">
-                          <div className="flex justify-between text-sm font-medium text-rose-800">
-                            <span>Total:</span>
-                            <span>
-                              R${" "}
-                              {servicos
-                                .filter((s) => formData.servico_ids.includes(s.id))
-                                .reduce((total, s) => total + s.preco, 0)
-                                .toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Textarea
-                    id="observacoes"
-                    value={formData.observacoes}
-                    onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                    placeholder="Observações adicionais (opcional)"
-                    className="min-h-[60px]"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-                  <Button type="submit" className="bg-rose-600 hover:bg-rose-700 flex-1 h-11">
-                    {editingAgendamento ? "Atualizar Agendamento" : "Confirmar Agendamento"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      onDialogClose()
-                      resetForm()
-                    }}
-                    className="flex-1 h-11"
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={onDialogClose}>
+        <DialogContent className="max-w-md mx-auto max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingAgendamento ? "Editar Agendamento" : "Novo Agendamento"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="cliente">Cliente</Label>
+              <Select
+                value={formData.cliente_id}
+                onValueChange={(value) => setFormData({ ...formData, cliente_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map((cliente) => (
+                    <SelectItem key={cliente.id} value={cliente.id}>
+                      {cliente.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="data">Data</Label>
+                <Input
+                  id="data"
+                  type="date"
+                  value={formData.data_agendamento}
+                  onChange={(e) => setFormData({ ...formData, data_agendamento: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="hora">Hora</Label>
+                <Input
+                  id="hora"
+                  type="time"
+                  value={formData.hora_agendamento}
+                  onChange={(e) => setFormData({ ...formData, hora_agendamento: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="servicos">Serviços</Label>
+              <div className="space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                {servicos.map((servico) => (
+                  <div key={servico.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`servico-${servico.id}`}
+                      checked={formData.servico_ids.includes(servico.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({
+                            ...formData,
+                            servico_ids: [...formData.servico_ids, servico.id],
+                          })
+                        } else {
+                          setFormData({
+                            ...formData,
+                            servico_ids: formData.servico_ids.filter((id) => id !== servico.id),
+                          })
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <label htmlFor={`servico-${servico.id}`} className="text-sm cursor-pointer flex-1">
+                      {servico.nome} - R$ {servico.preco.toFixed(2)}
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              {formData.servico_ids.length > 0 && (
+                <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-md">
+                  <h4 className="text-sm font-medium text-rose-800 mb-2">Serviços Selecionados:</h4>
+                  <div className="space-y-1">
+                    {servicos
+                      .filter((s) => formData.servico_ids.includes(s.id))
+                      .map((servico) => (
+                        <div key={servico.id} className="flex justify-between text-sm text-rose-700">
+                          <span>{servico.nome}</span>
+                          <span>R$ {servico.preco.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    <div className="border-t border-rose-300 pt-1 mt-2">
+                      <div className="flex justify-between text-sm font-medium text-rose-800">
+                        <span>Total:</span>
+                        <span>
+                          R${" "}
+                          {servicos
+                            .filter((s) => formData.servico_ids.includes(s.id))
+                            .reduce((total, s) => total + s.preco, 0)
+                            .toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="observacoes">Observações</Label>
+              <Textarea
+                id="observacoes"
+                value={formData.observacoes}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                placeholder="Observações adicionais (opcional)"
+                className="min-h-[60px]"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+              <Button type="submit" className="bg-rose-600 hover:bg-rose-700 flex-1 h-11">
+                {editingAgendamento ? "Atualizar Agendamento" : "Confirmar Agendamento"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onDialogClose()
+                  resetForm()
+                }}
+                className="flex-1 h-11"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-rose-200">
         <CardHeader className="pb-4">
