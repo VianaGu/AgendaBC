@@ -75,14 +75,12 @@ export default function Dashboard() {
     agendamentos: (Agendamento & { servicoNome?: string; servicoPreco?: number })[]
   } | null>(null)
 
-  const updateStats = async () => {
+  const updateStats = () => {
     try {
-      const [clientes, agendamentosHojeData, receitaTotal, portfolio] = await Promise.all([
-        getClientes(),
-        getAgendamentosHoje(),
-        getReceitaTotal(),
-        getPortfolio(),
-      ])
+      const clientes = getClientes()
+      const agendamentosHojeData = getAgendamentosHoje()
+      const receitaTotal = getReceitaTotal()
+      const portfolio = getPortfolio()
 
       setAgendamentosHoje(agendamentosHojeData)
 
@@ -110,9 +108,9 @@ export default function Dashboard() {
     updateStats()
   }, [])
 
-  const updateAgendamentoStatus = async (id: string, status: "concluido" | "cancelado") => {
+  const updateAgendamentoStatus = (id: string, status: "concluido" | "cancelado") => {
     try {
-      await updateAgendamento(id, { status })
+      updateAgendamento(id, { status })
       setAgendamentosHoje((prevAgendamentos) =>
         prevAgendamentos.map((agendamento) => (agendamento.id === id ? { ...agendamento, status } : agendamento)),
       )
@@ -125,10 +123,10 @@ export default function Dashboard() {
     }
   }
 
-  const iniciarAtendimento = async (agendamento: Agendamento) => {
+  const iniciarAtendimento = (agendamento: Agendamento) => {
     try {
-      const servicos = await getServicos()
-      const agendamentos = await getAgendamentos()
+      const servicos = getServicos()
+      const agendamentos = getAgendamentos()
 
       // Buscar todos os agendamentos do mesmo cliente na mesma data
       const agendamentosDoCliente = agendamentos.filter(
@@ -531,8 +529,8 @@ function CadastroClientes({
     cpf: "",
   })
 
-  const loadClientes = async () => {
-    const clientesData = await getClientes()
+  const loadClientes = () => {
+    const clientesData = getClientes()
     setClientes(clientesData)
   }
 
@@ -540,7 +538,7 @@ function CadastroClientes({
     loadClientes()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!formData.nome || !formData.telefone || !formData.cpf) {
@@ -555,19 +553,19 @@ function CadastroClientes({
     }
 
     try {
-      const cpfExiste = await checkCpfExists(formData.cpf, editingCliente?.id)
+      const cpfExiste = checkCpfExists(formData.cpf, editingCliente?.id)
       if (cpfExiste) {
         alert("Já existe um cliente cadastrado com este CPF")
         return
       }
 
       if (editingCliente) {
-        const clienteAtualizado = await updateCliente(editingCliente.id, formData)
+        const clienteAtualizado = updateCliente(editingCliente.id, formData)
         if (clienteAtualizado) {
           setClientes(clientes.map((c) => (c.id === editingCliente.id ? clienteAtualizado : c)))
         }
       } else {
-        const novoCliente = await saveCliente(formData)
+        const novoCliente = saveCliente(formData)
         if (novoCliente) {
           setClientes([...clientes, novoCliente])
         }
@@ -601,9 +599,9 @@ function CadastroClientes({
     setFormData({ ...formData, cpf: formatted })
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (confirm("Tem certeza que deseja excluir este cliente?")) {
-      const sucesso = await deleteCliente(id)
+      const sucesso = deleteCliente(id)
       if (sucesso) {
         setClientes(clientes.filter((c) => c.id !== id))
         onUpdate?.()
@@ -620,9 +618,9 @@ function CadastroClientes({
     )
   })
 
-  const carregarHistorico = async (cliente: Cliente) => {
+  const carregarHistorico = (cliente: Cliente) => {
     try {
-      const agendamentos = await getAgendamentos()
+      const agendamentos = getAgendamentos()
       const agendamentosCliente = agendamentos
         .filter((ag) => ag.cliente_id === cliente.id && ag.status === "concluido")
         .sort((a, b) => {
@@ -865,13 +863,12 @@ function SistemaAgendamentos({
     observacoes: "",
   })
 
-  const loadData = async () => {
+  const loadData = () => {
     try {
-      const [agendamentosData, clientesData, servicosData] = await Promise.all([
-        getAgendamentos(),
-        getClientes(),
-        getServicos(),
-      ])
+      const agendamentosData = getAgendamentos()
+      const clientesData = getClientes()
+      const servicosData = getServicos()
+
       setAgendamentos(agendamentosData)
       setClientes(clientesData)
       setServicos(servicosData)
@@ -896,9 +893,9 @@ function SistemaAgendamentos({
     }
   }, [selectedClienteId])
 
-  const handleStatusChange = async (agendamentoId: string, novoStatus: "concluido" | "cancelado") => {
+  const handleStatusChange = (agendamentoId: string, novoStatus: "concluido" | "cancelado") => {
     try {
-      const agendamentoAtualizado = await updateAgendamento(agendamentoId, { status: novoStatus })
+      const agendamentoAtualizado = updateAgendamento(agendamentoId, { status: novoStatus })
       if (agendamentoAtualizado) {
         setAgendamentos(agendamentos.map((a) => (a.id === agendamentoId ? agendamentoAtualizado : a)))
         onUpdate?.()
@@ -915,7 +912,7 @@ function SistemaAgendamentos({
     return date.toISOString().split("T")[0]
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!formData.data_agendamento) {
@@ -948,17 +945,20 @@ function SistemaAgendamentos({
           servico_id,
           observacoes: formData.observacoes,
           status: "agendado" as const,
+          preco: 0, // O preço será buscado na lista de serviços do cliente atual
         }
 
         if (editingAgendamento) {
-          await updateAgendamento(editingAgendamento.id, agendamentoData)
+          updateAgendamento(editingAgendamento.id, agendamentoData)
         } else {
-          await saveAgendamento(agendamentoData)
+          saveAgendamento(agendamentoData)
         }
       }
 
-      await loadData()
+      loadData()
       onDialogClose()
+      resetForm()
+      onUpdate?.()
     } catch (error) {
       console.error("Erro ao salvar agendamento:", error)
       alert("Erro ao salvar agendamento")
@@ -976,9 +976,9 @@ function SistemaAgendamentos({
     })
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (confirm("Tem certeza que deseja excluir este agendamento?")) {
-      const sucesso = await deleteAgendamento(id)
+      const sucesso = deleteAgendamento(id)
       if (sucesso) {
         setAgendamentos(agendamentos.filter((a) => a.id !== id))
         onUpdate?.()
@@ -1278,7 +1278,7 @@ function SistemaAgendamentos({
                 <div
                   key={dateStr}
                   className={`
-                    min-h-[80px] sm:min-h-[100px] p-1 sm:p-2 border rounded-lg relative cursor-pointer transition-colors
+                    min-h-[80px] sm:min-h-[100px] p-1 sm:p-2 border rounded-lg relative transition-colors
                     ${day.isCurrentMonth ? "bg-white border-rose-200" : "bg-gray-50 border-gray-200"}
                     ${isToday ? "ring-2 ring-rose-400" : ""}
                     ${isBlocked ? "bg-red-50 border-red-300" : ""}
@@ -1457,8 +1457,8 @@ function GerenciamentoServicos({ onUpdate }: { onUpdate?: () => void }) {
     duracao: "",
   })
 
-  const loadServicos = async () => {
-    const servicosData = await getServicos()
+  const loadServicos = () => {
+    const servicosData = getServicos()
     setServicos(servicosData)
   }
 
@@ -1466,7 +1466,7 @@ function GerenciamentoServicos({ onUpdate }: { onUpdate?: () => void }) {
     loadServicos()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!formData.nome || !formData.preco || !formData.duracao) {
@@ -1482,12 +1482,12 @@ function GerenciamentoServicos({ onUpdate }: { onUpdate?: () => void }) {
 
     try {
       if (editingServico) {
-        const servicoAtualizado = await updateServico(editingServico.id, servicoData)
+        const servicoAtualizado = updateServico(editingServico.id, servicoData)
         if (servicoAtualizado) {
           setServicos(servicos.map((s) => (s.id === editingServico.id ? servicoAtualizado : s)))
         }
       } else {
-        const novoServico = await saveServico(servicoData)
+        const novoServico = saveServico(servicoData)
         if (novoServico) {
           setServicos([...servicos, novoServico])
         }
@@ -1511,9 +1511,9 @@ function GerenciamentoServicos({ onUpdate }: { onUpdate?: () => void }) {
     })
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (confirm("Tem certeza que deseja excluir este serviço?")) {
-      const sucesso = await deleteServico(id)
+      const sucesso = deleteServico(id)
       if (sucesso) {
         setServicos(servicos.filter((s) => s.id !== id))
         onUpdate?.()
@@ -1648,8 +1648,8 @@ function GaleriaPortfolio({ onUpdate }: { onUpdate?: () => void }) {
     imagem_url: "",
   })
 
-  const loadPortfolio = async () => {
-    const portfolioData = await getPortfolio()
+  const loadPortfolio = () => {
+    const portfolioData = getPortfolio()
     setPortfolio(portfolioData)
   }
 
@@ -1657,7 +1657,7 @@ function GaleriaPortfolio({ onUpdate }: { onUpdate?: () => void }) {
     loadPortfolio()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!formData.titulo || !formData.imagem_url) {
@@ -1670,7 +1670,7 @@ function GaleriaPortfolio({ onUpdate }: { onUpdate?: () => void }) {
         // Para edição, usaríamos updatePortfolio se existisse
         alert("Funcionalidade de edição será implementada em breve")
       } else {
-        const novaFoto = await savePortfolio(formData)
+        const novaFoto = savePortfolio(formData)
         if (novaFoto) {
           setPortfolio([novaFoto, ...portfolio])
         }
@@ -1685,9 +1685,9 @@ function GaleriaPortfolio({ onUpdate }: { onUpdate?: () => void }) {
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (confirm("Tem certeza que deseja excluir esta foto?")) {
-      const sucesso = await deletePortfolio(id)
+      const sucesso = deletePortfolio(id)
       if (sucesso) {
         setPortfolio(portfolio.filter((f) => f.id !== id))
         onUpdate?.()
